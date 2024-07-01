@@ -68,3 +68,39 @@ func isTextFile(ext string) bool {
 	}
 	return false
 }
+
+// Function to get the programming language from the file extension
+func getLanguageFromExtension(ext string) string {
+	switch ext {
+	case ".go":
+		return "go"
+	case ".c", ".h":
+		return "c"
+	case ".mod":
+		return "mod"
+	case ".md":
+		return "md"
+	case ".py":
+		return "python"
+	case ".js":
+		return "javascript"
+	case ".html":
+		return "html"
+	case ".css":
+		return "css"
+	case ".java":
+		return "java"
+	case ".rb":
+		return "ruby"
+	case ".rs":
+		return "rust"
+	case ".cpp":
+		return "cpp"
+	case ".sh":
+		return "bash"
+	case ".txt":
+		return ""
+	default:
+		return ""
+	}
+}
