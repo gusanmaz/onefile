@@ -1,1 +1,11 @@
-module project2json
+module onefile
+
+go 1.16
+
+require (
+	github.com/gusanmaz/onefile v0.0.0-20240701201240-b18e40cc9eea // indirect
+	github.com/schollz/progressbar/v3 v3.8.2
+	github.com/spf13/cobra v1.2.1
+)
+
+replace github.com/gusanmaz/onefile => ./

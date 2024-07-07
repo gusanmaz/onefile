@@ -1,162 +1,203 @@
-# Project Dump, Reconstruction, and GitHub Fetcher
+# OneFile: Comprehensive Project and Package Management Tool
 
-This project consists of a set of Go programs that enable various operations on project structures and contents, including dumping a local project to JSON, reconstructing a project from JSON, converting JSON to Markdown, and fetching GitHub repositories.
+OneFile is a versatile command-line tool designed to streamline various operations on project structures and package contents. It enables developers to easily dump local projects, reconstruct projects from JSON, convert JSON to Markdown, and fetch contents from GitHub repositories and various package managers.
 
-## Purpose
+## Features
 
-The purpose of this project is to provide a convenient way to:
-1. Package a local project's source code and directory structure into a JSON format.
-2. Reconstruct a project from a JSON file.
-3. Convert a project's JSON representation into a human-readable Markdown format.
-4. Fetch a GitHub repository and save its structure and contents in either JSON or Markdown format.
+- **Local Project Dumping**: Convert local project structures and contents to JSON or Markdown.
+- **Project Reconstruction**: Rebuild project structures from JSON files.
+- **JSON to Markdown Conversion**: Transform JSON project representations into readable Markdown format.
+- **GitHub Repository Fetching**: Retrieve and save GitHub repository structures and contents.
+- **PyPI Package Fetching**: Download and save PyPI package structures and contents.
+- **Flexible Output**: Choose between JSON and Markdown output formats.
+- **Progress Reporting**: View download progress for fetching operations.
+- **Customizable Inclusion/Exclusion**: Use patterns to include or exclude specific files.
+- **Individual Command Execution**: Use as a single command with subcommands or as separate standalone commands.
 
-These tools can be particularly useful for sharing source code with Large Language Models (LLMs) for analysis or assistance, creating project snapshots, or generating documentation.
+## Installation
 
-## Files
+### Option 1: Install as a single command
 
-- `common.go`: Contains common definitions and utility functions used by the other programs.
-- `dump.go`: Dumps the project directory structure and text file contents into a JSON file.
-- `reconstruct.go`: Reconstructs the project directory structure and file contents from a JSON file.
-- `json2md.go`: Converts the JSON file into a Markdown representation of the project.
-- `github2file.go`: Fetches a GitHub repository and creates either a JSON or Markdown file from its contents.
+Ensure you have Go installed on your system, then run:
+
+```bash
+go install github.com/gusanmaz/onefile@latest
+```
+
+This installs the `onefile` binary in your `$GOPATH/bin` directory. Ensure this directory is in your system's PATH to run OneFile from anywhere.
+
+### Option 2: Build individual commands
+
+To use commands separately, clone the repository and build individual commands:
+
+```bash
+git clone https://github.com/gusanmaz/onefile.git
+cd onefile
+chmod +x build.sh
+./build.sh
+```
+
+This creates individual executables for each command in the `bin` directory.
 
 ## Usage
 
-### 1. Dumping a Local Project to JSON
+OneFile can be used either as a single command with subcommands or as individual commands.
 
-The `dump.go` program scans the specified project directory, collects the directory structure and text file contents, and writes this information to a JSON file.
+### Single Command Usage
 
-#### Command
-
-```sh
-./dump -path=../your_project_directory -output=project_data.json -whitelist=whitelist.txt -blacklist=blacklist.txt
-```
-
-#### Flags
-- `-path`: The root path of the project to be dumped. Default is the current directory.
-- `-output`: The output JSON file. Default is `project_data.json`.
-- `-whitelist`: Path to the whitelist file (optional). Only files matching these patterns will be included.
-- `-blacklist`: Path to the blacklist file (optional). Files matching these patterns will be excluded.
-
-### 2. Reconstructing a Project from JSON
-
-The `reconstruct.go` program reads a JSON file containing a project's directory structure and file contents, and reconstructs the project in the specified directory.
-
-#### Command
+#### 1. Dumping a Local Project
 
 ```sh
-./reconstruct -json=project_data.json -path=../reconstructed_project_directory
+onefile dump -p /path/to/your/project -o output_file -t json
 ```
 
-#### Flags
-- `-json`: The input JSON file. Default is `project_data.json`.
-- `-path`: The root path where the project will be reconstructed. Default is the current directory.
+Flags:
+- `-p, --path`: Project root path (default: current directory)
+- `-o, --output`: Output file name (without extension)
+- `-t, --type`: Output type: 'json' or 'md' (default: 'json')
+- `-i, --include`: Patterns to include files (space-separated)
+- `-e, --exclude`: Patterns to exclude files (space-separated)
 
-### 3. Generating Markdown from JSON
-
-The `json2md.go` program reads a JSON file containing a project's directory structure and file contents, and generates a Markdown file representing the project.
-
-#### Command
+#### 2. Reconstructing a Project from JSON
 
 ```sh
-./json2md -json=project_data.json -output=project_structure.md
+onefile reconstruct -j project_data.json -o /path/to/output/directory
 ```
 
-#### Flags
-- `-json`: The input JSON file. Default is `project_data.json`.
-- `-output`: The output Markdown file. Default is `project_structure.md`.
+Flags:
+- `-j, --json`: Input JSON file
+- `-o, --output`: Output directory for project reconstruction
 
-### 4. Fetching GitHub Repository and Creating JSON/Markdown
-
-The `github2file.go` program fetches a GitHub repository and creates either a JSON or Markdown file containing the repository's structure and text file contents.
-
-#### Command
+#### 3. Converting JSON to Markdown
 
 ```sh
-./github2file -url=https://github.com/username/repo -type=json -output=output_file.json
+onefile json2md -j project_data.json -o project_structure.md
 ```
 
-or
+Flags:
+- `-j, --json`: Input JSON file
+- `-o, --output`: Output Markdown file
+
+#### 4. Fetching GitHub Repository
 
 ```sh
-./github2file -owner=username -repo=repository -type=md -output=output_file.md
+onefile github2file -u https://github.com/username/repo -t json -o output_file.json
 ```
 
-#### Flags
-- `-url`: The full GitHub repository URL (optional, can be used instead of -owner and -repo).
-- `-owner`: The GitHub username of the repository owner (required if -url is not provided).
-- `-repo`: The name of the GitHub repository (required if -url is not provided).
-- `-type`: The output type, either 'json' or 'md' (default is 'json').
-- `-output`: The name of the output file (optional, default is "{owner}_{repo}.{type}").
+Flags:
+- `-u, --url`: Full GitHub repository URL
+- `-t, --type`: Output type: 'json' or 'md' (default: 'md')
+- `-o, --output`: Output file name (without extension)
+- `-d, --output-dir`: Output directory
+- `-i, --include`: Patterns to include files (space-separated)
+- `-e, --exclude`: Patterns to exclude files (space-separated)
+- `-a, --all-repos`: Fetch all repositories for a user
 
-## Compilation
-
-To compile the programs, run the following commands:
+#### 5. Fetching PyPI Package
 
 ```sh
-go build -o dump dump.go common.go
-go build -o reconstruct reconstruct.go common.go
-go build -o json2md json2md.go common.go
-go build -o github2file github2file.go common.go
+onefile pypi2file -p package_name -t json -o output_file.json
 ```
+
+Flags:
+- `-p, --package`: PyPI package name
+- `-t, --type`: Output type: 'json' or 'md' (default: 'md')
+- `-o, --output`: Output file name (without extension)
+- `-d, --output-dir`: Output directory
+
+### Individual Command Usage
+
+If you've built individual commands, you can use them as follows:
+
+- Dump a local project:
+  ```
+  ./bin/dump -p /path/to/your/project -o output_file -t json
+  ```
+
+- Fetch a GitHub repository:
+  ```
+  ./bin/github2file -u https://github.com/username/repo -t json -o output_file.json
+  ```
+
+- Convert JSON to Markdown:
+  ```
+  ./bin/json2md -j project_data.json -o project_structure.md
+  ```
+
+- Fetch a PyPI package:
+  ```
+  ./bin/pypi2file -p package_name -t json -o output_file.json
+  ```
+
+- Reconstruct a project from JSON:
+  ```
+  ./bin/reconstruct -j project_data.json -o /path/to/output/directory
+  ```
+
+## Use Cases
+
+1. **LLM Code Analysis**: Package entire projects for submission to Large Language Models for code review, refactoring suggestions, or documentation generation.
+
+2. **Project Snapshots**: Create snapshots of project states for version control or backup purposes.
+
+3. **Open Source Exploration**: Easily fetch and examine the structure of open-source projects on GitHub without cloning entire repositories.
+
+4. **Documentation Generation**: Automatically generate project structure documentation in Markdown format for wikis or README files.
+
+5. **Dependency Analysis**: Fetch PyPI packages to analyze their structure and contents before including them in your project.
+
+6. **Code Sharing**: Share project structures and contents with colleagues or in forum posts without zipping and uploading entire projects.
+
+7. **Project Comparisons**: Dump multiple project versions to JSON and use diff tools to compare structures and contents over time.
+
+8. **Automated Tooling**: Incorporate OneFile into CI/CD pipelines for automated project analysis, documentation updates, or dependency checks.
 
 ## Example Workflow
 
 1. **Dump a local project to JSON:**
 
 ```sh
-./dump -path=../your_project_directory -output=project_data.json
+onefile dump -p /path/to/your/project -o project_data -t json
 ```
 
-2. **Reconstruct the project from JSON:**
+2. **Convert the JSON to Markdown:**
 
 ```sh
-./reconstruct -json=project_data.json -path=../reconstructed_project_directory
+onefile json2md -j project_data.json -o project_structure.md
 ```
 
-3. **Generate Markdown from the JSON file:**
+3. **Fetch a GitHub repository and create a Markdown file:**
 
 ```sh
-./json2md -json=project_data.json -output=project_structure.md
+onefile github2file -u https://github.com/octocat/Hello-World -t md -o github_project
 ```
 
-4. **Fetch a GitHub repository and create a JSON file:**
+4. **Fetch a PyPI package and create a JSON file:**
 
 ```sh
-./github2file -url=https://github.com/octocat/Hello-World -type=json -output=github_project.json
-```
-
-5. **Fetch a GitHub repository and create a Markdown file:**
-
-```sh
-./github2file -owner=octocat -repo=Hello-World -type=md -output=github_project.md
-```
-
-## Features
-
-- **Local Project Dumping**: Dump local project structure and contents to JSON.
-- **Project Reconstruction**: Reconstruct project from JSON file.
-- **JSON to Markdown Conversion**: Convert JSON project representation to readable Markdown format.
-- **GitHub Repository Fetching**: Fetch GitHub repositories using full URL or owner/repo combination.
-- **Progress Reporting**: Display download progress while fetching GitHub repositories.
-- **Flexible Output**: Choose between JSON and Markdown output formats for GitHub fetching.
-- **Error Handling**: Improved error handling for invalid GitHub URLs or non-existent repositories.
-
-## Project Structure
-
-```
-.
-├── common.go
-├── dump.go
-├── reconstruct.go
-├── json2md.go
-└── github2file.go
+onefile pypi2file -p numpy -t json -o numpy_package
 ```
 
 ## Contributing
 
-Contributions are welcome! Please feel free to submit a pull request or open an issue to discuss any changes or improvements.
+Contributions to OneFile are welcome! Please feel free to submit pull requests, open issues, or suggest new features. Here are some areas where contributions could be particularly valuable:
+
+- Adding support for more package managers (npm, Maven, RubyGems, etc.)
+- Improving error handling and user feedback
+- Enhancing performance for large projects or repositories
+- Adding more output format options
+- Creating comprehensive test suites
+
+Before contributing, please review our contribution guidelines (CONTRIBUTING.md).
 
 ## License
 
-This project is licensed under the MIT License.
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
+
+## Support
+
+If you encounter any issues or have questions about using OneFile, please open an issue on our GitHub repository. We'll do our best to assist you promptly.
+
+## Acknowledgments
+
+We'd like to thank all the contributors who have helped make OneFile a robust and useful tool for the developer community. Your efforts are greatly appreciated!
