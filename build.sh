@@ -3,6 +3,9 @@
 # Ensure we're in the project root
 cd "$(dirname "$0")"
 
+# Run go mod tidy to ensure dependencies are up to date
+go mod tidy
+
 # Build the main onefile command
 go build -o bin/onefile main.go
 

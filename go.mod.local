@@ -1,4 +1,4 @@
-module github.com/gusanmaz/onefile
+module onefile
 
 go 1.16
 
@@ -9,3 +9,4 @@ require (
 	github.com/spf13/cobra v1.2.1
 )
 
+replace github.com/gusanmaz/onefile => ./
