@@ -3,7 +3,8 @@ module onefile
 go 1.16
 
 require (
-	github.com/gusanmaz/onefile v0.0.0-20240701201240-b18e40cc9eea // indirect
+	github.com/alecthomas/chroma v0.10.0
+	github.com/gusanmaz/onefile v0.0.0-20240701201240-b18e40cc9eea
 	github.com/schollz/progressbar/v3 v3.8.2
 	github.com/spf13/cobra v1.2.1
 )

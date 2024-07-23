@@ -12,6 +12,7 @@ import (
 func NewDumpCmd() *cobra.Command {
 	var rootPath, outputPath, outputType string
 	var includePatterns, excludePatterns []string
+	var includeGit, includeNonText bool
 	var cmd = &cobra.Command{
 		Use:   "dump",
 		Short: "Dump a local project to JSON or Markdown",
@@ -23,7 +24,7 @@ func NewDumpCmd() *cobra.Command {
 				}
 			}
 
-			projectData, err := internal.DumpProject(rootPath, includePatterns, excludePatterns)
+			projectData, err := internal.DumpProject(rootPath, includePatterns, excludePatterns, includeGit, includeNonText)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "Error dumping project: %v\n", err)
 				return
@@ -72,6 +73,8 @@ func NewDumpCmd() *cobra.Command {
 	cmd.Flags().StringVarP(&outputType, "type", "t", "json", "Output type: json or md")
 	cmd.Flags().StringSliceVarP(&includePatterns, "include", "i", []string{"*"}, "Patterns to include files (space-separated)")
 	cmd.Flags().StringSliceVarP(&excludePatterns, "exclude", "e", []string{}, "Patterns to exclude files (space-separated)")
+	cmd.Flags().BoolVar(&includeGit, "include-git", false, "Include .git files and directories")
+	cmd.Flags().BoolVar(&includeNonText, "include-non-text", false, "Include non-text files")
 
 	return cmd
 }
