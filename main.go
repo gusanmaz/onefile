@@ -25,7 +25,7 @@ func main() {
 		cmd.NewReconstructCmd(),
 		cmd.NewJSON2MDCmd(),
 		cmd.NewGitHub2FileCmd(),
-		cmd.NewPyPI2FileCmd(), // Add the new PyPI command
+		cmd.NewPyPI2FileCmd(),
 	)
 
 	if err := rootCmd.Execute(); err != nil {

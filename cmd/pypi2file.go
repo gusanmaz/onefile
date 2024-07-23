@@ -11,6 +11,7 @@ import (
 
 func NewPyPI2FileCmd() *cobra.Command {
 	var packageName, outputType, outputDir, outputName string
+	var includeGit, includeNonText bool
 	var cmd = &cobra.Command{
 		Use:   "pypi2file",
 		Short: "Fetch a PyPI package and save as JSON or Markdown",
@@ -35,9 +36,9 @@ func NewPyPI2FileCmd() *cobra.Command {
 			}
 
 			if outputType == "json" {
-				err = internal.SaveAsJSON(projectData, outputPath)
+				err = internal.SaveAsJSON(projectData, outputPath, includeGit, includeNonText)
 			} else if outputType == "md" {
-				err = internal.SaveAsMarkdown(projectData, outputPath)
+				err = internal.SaveAsMarkdown(projectData, outputPath, includeGit, includeNonText)
 			} else {
 				fmt.Fprintf(os.Stderr, "Invalid output type. Use 'json' or 'md'\n")
 				return
@@ -56,6 +57,8 @@ func NewPyPI2FileCmd() *cobra.Command {
 	cmd.Flags().StringVarP(&outputType, "type", "t", "md", "Output type: json or md")
 	cmd.Flags().StringVarP(&outputDir, "output-dir", "d", ".", "Output directory")
 	cmd.Flags().StringVarP(&outputName, "output-name", "n", "", "Output file name (without extension)")
+	cmd.Flags().BoolVar(&includeGit, "include-git", false, "Include .git files and directories")
+	cmd.Flags().BoolVar(&includeNonText, "include-non-text", false, "Include non-text files")
 
 	cmd.MarkFlagRequired("package")
 

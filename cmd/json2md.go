@@ -12,6 +12,7 @@ import (
 
 func NewJSON2MDCmd() *cobra.Command {
 	var jsonPath, outputPath string
+	var includeGit, includeNonText bool
 	var cmd = &cobra.Command{
 		Use:   "json2md",
 		Short: "Convert JSON to Markdown",
@@ -30,7 +31,7 @@ func NewJSON2MDCmd() *cobra.Command {
 				return
 			}
 
-			markdown := internal.GenerateMarkdown(projectData)
+			markdown := internal.GenerateMarkdown(projectData, includeGit, includeNonText)
 
 			err = ioutil.WriteFile(outputPath, []byte(markdown), 0644)
 			if err != nil {
@@ -44,6 +45,8 @@ func NewJSON2MDCmd() *cobra.Command {
 
 	cmd.Flags().StringVarP(&jsonPath, "json", "j", "project_data.json", "Input JSON file")
 	cmd.Flags().StringVarP(&outputPath, "output", "o", "project_structure.md", "Output Markdown file")
+	cmd.Flags().BoolVar(&includeGit, "include-git", false, "Include .git files and directories")
+	cmd.Flags().BoolVar(&includeNonText, "include-non-text", false, "Include non-text files")
 
 	return cmd
 }

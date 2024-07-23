@@ -3,10 +3,11 @@ package internal
 import (
 	"archive/tar"
 	"archive/zip"
+	"bufio"
 	"compress/gzip"
+	_ "embed"
 	"encoding/json"
 	"fmt"
-	"github.com/schollz/progressbar/v3"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -16,7 +17,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/alecthomas/chroma/lexers"
+	"github.com/sabhiram/go-gitignore"
+	"github.com/schollz/progressbar/v3"
 )
 
 type FileData struct {
@@ -41,45 +43,91 @@ type GithubRepo struct {
 	Name string `json:"name"`
 }
 
-func getLanguageFromExtension(filename string) string {
-	lexer := lexers.Match(filename)
-	if lexer == nil {
-		return ""
+//go:embed extension_language_map.json
+var languageMappingJSON []byte
+
+var languageMapping map[string][]string
+
+func init() {
+	err := json.Unmarshal(languageMappingJSON, &languageMapping)
+	if err != nil {
+		fmt.Println("Error parsing embedded language mapping:", err)
 	}
-	return strings.ToLower(lexer.Config().Name)
+}
+
+func getLanguagesFromFile(filename string) []string {
+	if languages, ok := languageMapping[filename]; ok {
+		return languages
+	}
+	ext := strings.ToLower(filepath.Ext(filename))
+	if languages, ok := languageMapping[ext]; ok {
+		return languages
+	}
+	return nil
+}
+
+func getLanguageFromExtension(filename string) string {
+	languages := getLanguagesFromFile(filename)
+	if len(languages) > 0 {
+		return languages[0]
+	}
+	return ""
 }
 
 func isTextFile(path string) bool {
-	lexer := lexers.Match(path)
-	return lexer != nil
+	return len(getLanguagesFromFile(path)) > 0
 }
 
-func matchesPatterns(path string, includePatterns, excludePatterns []string, includeGit, includeNonText bool) bool {
+func loadPatternsFromFile(filename string) ([]string, error) {
+	file, err := os.Open(filename)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+
+	var patterns []string
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		pattern := strings.TrimSpace(scanner.Text())
+		if pattern != "" && !strings.HasPrefix(pattern, "#") {
+			patterns = append(patterns, pattern)
+		}
+	}
+
+	return patterns, scanner.Err()
+}
+
+func CreateGitIgnoreMatcher(patterns []string) *ignore.GitIgnore {
+	return ignore.CompileIgnoreLines(patterns...)
+}
+
+func MatchesPatterns(path string, gitIgnore *ignore.GitIgnore, includeGit, includeNonText bool) bool {
 	if !includeGit && (strings.HasPrefix(path, ".git"+string(os.PathSeparator)) || path == ".git") {
 		return false
 	}
-
-	for _, pattern := range excludePatterns {
-		if matched, _ := filepath.Match(pattern, filepath.Base(path)); matched {
-			return false
-		}
+	if gitIgnore.MatchesPath(path) {
+		return false
 	}
-
-	for _, pattern := range includePatterns {
-		if pattern == "*" {
-			return includeNonText || isTextFile(path)
-		}
-		if matched, _ := filepath.Match(pattern, filepath.Base(path)); matched {
-			return includeNonText || isTextFile(path)
-		}
-		if strings.HasPrefix(pattern, ".") && strings.HasSuffix(path, pattern) {
-			return includeNonText || isTextFile(path)
-		}
-	}
-	return false
+	return includeNonText || isTextFile(path)
 }
 
-func DumpProject(rootPath string, includePatterns, excludePatterns []string, includeGit, includeNonText bool) (ProjectData, error) {
+func ParsePatterns(patterns []string) ([]string, error) {
+	var result []string
+	for _, pattern := range patterns {
+		if strings.HasPrefix(pattern, "@") {
+			filePatterns, err := loadPatternsFromFile(strings.TrimPrefix(pattern, "@"))
+			if err != nil {
+				return nil, err
+			}
+			result = append(result, filePatterns...)
+		} else {
+			result = append(result, pattern)
+		}
+	}
+	return result, nil
+}
+
+func DumpProject(rootPath string, gitIgnore *ignore.GitIgnore, includeGit, includeNonText bool) (ProjectData, error) {
 	var projectData ProjectData
 
 	err := filepath.Walk(rootPath, func(path string, info os.FileInfo, err error) error {
@@ -96,15 +144,17 @@ func DumpProject(rootPath string, includePatterns, excludePatterns []string, inc
 		}
 
 		if info.IsDir() {
-			if includeGit || !strings.HasPrefix(relPath, ".git") {
-				projectData.Directories = append(projectData.Directories, relPath)
+			projectData.Directories = append(projectData.Directories, relPath)
+		} else {
+			if MatchesPatterns(relPath, gitIgnore, includeGit, includeNonText) {
+				content, err := ioutil.ReadFile(path)
+				if err != nil {
+					return err
+				}
+				projectData.Files = append(projectData.Files, FileData{Path: relPath, Content: string(content)})
+			} else {
+				projectData.Files = append(projectData.Files, FileData{Path: relPath, Content: ""})
 			}
-		} else if matchesPatterns(relPath, includePatterns, excludePatterns, includeGit, includeNonText) {
-			content, err := ioutil.ReadFile(path)
-			if err != nil {
-				return err
-			}
-			projectData.Files = append(projectData.Files, FileData{Path: relPath, Content: string(content)})
 		}
 		return nil
 	})
@@ -115,46 +165,92 @@ func DumpProject(rootPath string, includePatterns, excludePatterns []string, inc
 
 	return projectData, nil
 }
-func SaveAsJSON(projectData ProjectData, outputPath string) error {
-	data, err := json.MarshalIndent(projectData, "", "  ")
+
+func SaveAsJSON(projectData ProjectData, outputPath string, includeGit, includeNonText bool) error {
+	// Filter directories
+	filteredDirs := make([]string, 0, len(projectData.Directories))
+	for _, dir := range projectData.Directories {
+		if includeGit || !strings.HasPrefix(dir, ".git") {
+			filteredDirs = append(filteredDirs, dir)
+		}
+	}
+
+	// Filter files
+	filteredFiles := make([]FileData, 0, len(projectData.Files))
+	for _, file := range projectData.Files {
+		if (includeGit || !strings.HasPrefix(file.Path, ".git/")) && (includeNonText || isTextFile(file.Path)) {
+			filteredFiles = append(filteredFiles, file)
+		}
+	}
+
+	// Create filtered project data
+	filteredProjectData := ProjectData{
+		Directories: filteredDirs,
+		Files:       filteredFiles,
+	}
+
+	// Marshal the filtered data to JSON
+	data, err := json.MarshalIndent(filteredProjectData, "", "  ")
 	if err != nil {
 		return err
 	}
+
+	// Write the JSON data to the output file
 	return ioutil.WriteFile(outputPath, data, 0644)
 }
 
-func SaveAsMarkdown(projectData ProjectData, outputPath string) error {
-	markdown := GenerateMarkdown(projectData)
+func getFilePaths(files []FileData) []string {
+	paths := make([]string, len(files))
+	for i, file := range files {
+		paths[i] = file.Path
+	}
+	return paths
+}
+
+func SaveAsMarkdown(projectData ProjectData, outputPath string, includeGit, includeNonText bool) error {
+	markdown := GenerateMarkdown(projectData, includeGit, includeNonText)
 	return ioutil.WriteFile(outputPath, []byte(markdown), 0644)
 }
 
-func GenerateMarkdown(projectData ProjectData) string {
+func GenerateMarkdown(projectData ProjectData, includeGit, includeNonText bool) string {
 	var md strings.Builder
 
 	md.WriteString("# Project Structure\n\n")
 	md.WriteString("```\n")
-	md.WriteString(generateProjectTree(projectData))
+	md.WriteString(generateProjectTree(projectData, includeGit, includeNonText))
 	md.WriteString("```\n\n")
 
 	md.WriteString("## Shell Commands to Create Project Structure\n\n")
 	md.WriteString("```bash\n")
-	md.WriteString(GenerateShellCommands(projectData))
+	md.WriteString(GenerateShellCommands(projectData, includeGit, includeNonText))
 	md.WriteString("```\n\n")
 
 	md.WriteString("## File Contents\n\n")
 	for _, file := range projectData.Files {
-		language := getLanguageFromExtension(file.Path)
-		md.WriteString(fmt.Sprintf("### %s\n\n```%s\n%s\n```\n\n", file.Path, language, file.Content))
+		if file.Content != "" && (includeGit || !strings.HasPrefix(file.Path, ".git/")) && (includeNonText || isTextFile(file.Path)) {
+			language := getLanguageFromExtension(file.Path)
+			md.WriteString(fmt.Sprintf("### %s\n\n```%s\n%s\n```\n\n", file.Path, language, file.Content))
+		}
 	}
 
 	return md.String()
 }
 
-func generateProjectTree(projectData ProjectData) string {
+func generateProjectTree(projectData ProjectData, includeGit, includeNonText bool) string {
 	var tree strings.Builder
 	tree.WriteString(".\n")
 
-	allPaths := append(projectData.Directories, getFilePaths(projectData.Files)...)
+	var allPaths []string
+	for _, dir := range projectData.Directories {
+		if includeGit || !strings.HasPrefix(dir, ".git") {
+			allPaths = append(allPaths, dir)
+		}
+	}
+	for _, file := range projectData.Files {
+		if (includeGit || !strings.HasPrefix(file.Path, ".git")) && (includeNonText || isTextFile(file.Path)) {
+			allPaths = append(allPaths, file.Path)
+		}
+	}
 	sort.Strings(allPaths)
 
 	for i, path := range allPaths {
@@ -172,28 +268,23 @@ func generateProjectTree(projectData ProjectData) string {
 
 	return tree.String()
 }
-
-func getFilePaths(files []FileData) []string {
-	paths := make([]string, len(files))
-	for i, file := range files {
-		paths[i] = file.Path
-	}
-	return paths
-}
-
-func GenerateShellCommands(projectData ProjectData) string {
+func GenerateShellCommands(projectData ProjectData, includeGit, includeNonText bool) string {
 	var commands strings.Builder
 
 	for _, dir := range projectData.Directories {
-		commands.WriteString(fmt.Sprintf("mkdir -p \"%s\"\n", dir))
+		if includeGit || !strings.HasPrefix(dir, ".git") {
+			commands.WriteString(fmt.Sprintf("mkdir -p \"%s\"\n", dir))
+		}
 	}
 
 	for _, file := range projectData.Files {
-		dir := filepath.Dir(file.Path)
-		if dir != "." {
-			commands.WriteString(fmt.Sprintf("mkdir -p \"%s\"\n", dir))
+		if (includeGit || !strings.HasPrefix(file.Path, ".git/")) && (includeNonText || isTextFile(file.Path)) {
+			dir := filepath.Dir(file.Path)
+			if dir != "." {
+				commands.WriteString(fmt.Sprintf("mkdir -p \"%s\"\n", dir))
+			}
+			commands.WriteString(fmt.Sprintf("touch \"%s\"\n", file.Path))
 		}
-		commands.WriteString(fmt.Sprintf("touch \"%s\"\n", file.Path))
 	}
 
 	return commands.String()
@@ -217,14 +308,14 @@ func ParseGitHubURL(url string) (owner string, repo string, path string, err err
 	return owner, repo, path, nil
 }
 
-func FetchGithubRepo(owner, repo, path string, includePatterns, excludePatterns []string, useGit bool, githubToken string, includeGit, includeNonText bool) (ProjectData, error) {
+func FetchGithubRepo(owner, repo, path string, gitIgnore *ignore.GitIgnore, useGit bool, githubToken string, includeGit, includeNonText bool) (ProjectData, error) {
 	if useGit {
-		return fetchWithGit(owner, repo, path, includePatterns, excludePatterns, includeGit, includeNonText)
+		return fetchWithGit(owner, repo, path, gitIgnore, includeGit, includeNonText)
 	}
-	return fetchWithAPI(owner, repo, path, includePatterns, excludePatterns, githubToken, includeGit, includeNonText)
+	return fetchWithAPI(owner, repo, path, gitIgnore, githubToken, includeGit, includeNonText)
 }
 
-func fetchWithGit(owner, repo, path string, includePatterns, excludePatterns []string, includeGit, includeNonText bool) (ProjectData, error) {
+func fetchWithGit(owner, repo, path string, gitIgnore *ignore.GitIgnore, includeGit, includeNonText bool) (ProjectData, error) {
 	tmpDir, err := ioutil.TempDir("", "github-clone-")
 	if err != nil {
 		return ProjectData{}, err
@@ -239,17 +330,17 @@ func fetchWithGit(owner, repo, path string, includePatterns, excludePatterns []s
 	}
 
 	projectPath := filepath.Join(tmpDir, path)
-	return DumpProject(projectPath, includePatterns, excludePatterns, includeGit, includeNonText)
+	return DumpProject(projectPath, gitIgnore, includeGit, includeNonText)
 }
 
-func fetchWithAPI(owner, repo, path string, includePatterns, excludePatterns []string, githubToken string, includeGit, includeNonText bool) (ProjectData, error) {
+func fetchWithAPI(owner, repo, path string, gitIgnore *ignore.GitIgnore, githubToken string, includeGit, includeNonText bool) (ProjectData, error) {
 	var projectData ProjectData
 	apiURL := fmt.Sprintf("https://api.github.com/repos/%s/%s/contents/%s", owner, repo, path)
 
 	bar := progressbar.Default(-1, "Fetching repository")
 
 	client := &http.Client{}
-	err := fetchContents(apiURL, path, &projectData, includePatterns, excludePatterns, bar, client, githubToken, includeGit, includeNonText)
+	err := fetchContents(apiURL, path, &projectData, gitIgnore, bar, client, githubToken, includeGit, includeNonText)
 	if err != nil {
 		return ProjectData{}, err
 	}
@@ -264,7 +355,7 @@ func fetchWithAPI(owner, repo, path string, includePatterns, excludePatterns []s
 	return projectData, nil
 }
 
-func fetchContents(url, path string, projectData *ProjectData, includePatterns, excludePatterns []string, bar *progressbar.ProgressBar, client *http.Client, githubToken string, includeGit, includeNonText bool) error {
+func fetchContents(url, path string, projectData *ProjectData, gitIgnore *ignore.GitIgnore, bar *progressbar.ProgressBar, client *http.Client, githubToken string, includeGit, includeNonText bool) error {
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return err
@@ -307,16 +398,20 @@ func fetchContents(url, path string, projectData *ProjectData, includePatterns, 
 
 		if content.Type == "dir" {
 			projectData.Directories = append(projectData.Directories, content.Path)
-			err = fetchContents(content.URL, content.Path, projectData, includePatterns, excludePatterns, bar, client, githubToken, includeGit, includeNonText)
+			err = fetchContents(content.URL, content.Path, projectData, gitIgnore, bar, client, githubToken, includeGit, includeNonText)
 			if err != nil {
 				return err
 			}
-		} else if content.Type == "file" && matchesPatterns(content.Path, includePatterns, excludePatterns, includeGit, includeNonText) {
-			fileContent, err := fetchFileContent(content.DownloadURL, client, githubToken)
-			if err != nil {
-				return err
+		} else if content.Type == "file" {
+			if MatchesPatterns(content.Path, gitIgnore, includeGit, includeNonText) {
+				fileContent, err := fetchFileContent(content.DownloadURL, client, githubToken)
+				if err != nil {
+					return err
+				}
+				projectData.Files = append(projectData.Files, FileData{Path: content.Path, Content: fileContent})
+			} else {
+				projectData.Files = append(projectData.Files, FileData{Path: content.Path, Content: ""})
 			}
-			projectData.Files = append(projectData.Files, FileData{Path: content.Path, Content: fileContent})
 			bar.Describe(fmt.Sprintf("Downloaded: %s", filepath.Base(content.Path)))
 			bar.Add(1)
 			fmt.Printf("Processed: %s\n", filepath.Base(content.Path))
@@ -439,7 +534,6 @@ func FetchPyPIPackage(packageName string) (ProjectData, error) {
 		return projectData, fmt.Errorf("no download URL found for package %s", packageName)
 	}
 
-	// Prefer source distribution (.tar.gz) if available, otherwise use the first URL
 	var packageURL string
 	for _, url := range pypiData.Urls {
 		if strings.HasSuffix(url.Filename, ".tar.gz") {
@@ -461,7 +555,6 @@ func FetchPyPIPackage(packageName string) (ProjectData, error) {
 		return projectData, fmt.Errorf("failed to download package from %s", packageURL)
 	}
 
-	// Create a temporary file to store the downloaded package
 	tmpFile, err := ioutil.TempFile("", "pypi-package-*")
 	if err != nil {
 		return projectData, err
@@ -469,19 +562,16 @@ func FetchPyPIPackage(packageName string) (ProjectData, error) {
 	defer os.Remove(tmpFile.Name())
 	defer tmpFile.Close()
 
-	// Copy the downloaded content to the temporary file
 	_, err = io.Copy(tmpFile, resp.Body)
 	if err != nil {
 		return projectData, err
 	}
 
-	// Rewind the file for reading
 	_, err = tmpFile.Seek(0, 0)
 	if err != nil {
 		return projectData, err
 	}
 
-	// Handle different package formats
 	if strings.HasSuffix(packageURL, ".tar.gz") {
 		return extractTarGz(tmpFile)
 	} else if strings.HasSuffix(packageURL, ".whl") {
