@@ -6,7 +6,7 @@ import (
 	"io/ioutil"
 	"os"
 
-	"github.com/gusanmaz/onefile/internal"
+	"github.com/gusanmaz/onefile/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -24,14 +24,14 @@ func NewJSON2MDCmd() *cobra.Command {
 				return
 			}
 
-			var projectData internal.ProjectData
+			var projectData utils.ProjectData
 			err = json.Unmarshal(data, &projectData)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "Error unmarshaling JSON: %v\n", err)
 				return
 			}
 
-			markdown := internal.GenerateMarkdown(projectData, includeGit, includeNonText)
+			markdown := utils.GenerateMarkdown(projectData, includeGit, includeNonText)
 
 			err = ioutil.WriteFile(outputPath, []byte(markdown), 0644)
 			if err != nil {

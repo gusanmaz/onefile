@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/gusanmaz/onefile/internal"
+	"github.com/gusanmaz/onefile/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -20,7 +20,7 @@ func NewGitHub2FileCmd() *cobra.Command {
 		Short: "Fetch a GitHub repository and save as JSON or Markdown",
 		Long: `Fetch a GitHub repository and save its structure and contents as JSON or Markdown.
 Exclude patterns can be specified directly or by referencing a file with @.
-Example: -e "*.go @.gitignore" -e "internal/extension_language_map.json go.mod go.sum"`,
+Example: -e "*.go @.gitignore" -e "utils/extension_language_map.json go.mod go.sum"`,
 		Run: func(cmd *cobra.Command, args []string) {
 			if repoURL == "" && !allRepos {
 				fmt.Println("Please provide a GitHub URL or use the -a flag")
@@ -34,22 +34,22 @@ Example: -e "*.go @.gitignore" -e "internal/extension_language_map.json go.mod g
 				processedPatterns = append(processedPatterns, patterns...)
 			}
 
-			parsedExcludePatterns, err := internal.ParsePatterns(processedPatterns)
+			parsedExcludePatterns, err := utils.ParsePatterns(processedPatterns)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "Error parsing exclude patterns: %v\n", err)
 				return
 			}
 
-			gitIgnore := internal.CreateGitIgnoreMatcher(parsedExcludePatterns)
+			gitIgnore := utils.CreateGitIgnoreMatcher(parsedExcludePatterns)
 
 			if allRepos {
-				owner, _, _, err := internal.ParseGitHubURL(repoURL)
+				owner, _, _, err := utils.ParseGitHubURL(repoURL)
 				if err != nil {
 					fmt.Fprintf(os.Stderr, "Error parsing GitHub URL: %v\n", err)
 					return
 				}
 
-				repos, err := internal.FetchUserRepos(owner, githubToken)
+				repos, err := utils.FetchUserRepos(owner, githubToken)
 				if err != nil {
 					fmt.Fprintf(os.Stderr, "Error fetching user repositories: %v\n", err)
 					return
@@ -79,7 +79,7 @@ Example: -e "*.go @.gitignore" -e "internal/extension_language_map.json go.mod g
 }
 
 func fetchAndSaveRepo(repoURL, outputType, outputDir, outputName string, gitIgnore *ignore.GitIgnore, useGit bool, githubToken string, includeGit, includeNonText bool) {
-	owner, repo, path, err := internal.ParseGitHubURL(repoURL)
+	owner, repo, path, err := utils.ParseGitHubURL(repoURL)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error parsing GitHub URL: %v\n", err)
 		return
@@ -92,7 +92,7 @@ func fetchAndSaveRepo(repoURL, outputType, outputDir, outputName string, gitIgno
 		}
 	}
 
-	projectData, err := internal.FetchGithubRepo(owner, repo, path, gitIgnore, useGit, githubToken, includeGit, includeNonText)
+	projectData, err := utils.FetchGithubRepo(owner, repo, path, gitIgnore, useGit, githubToken, includeGit, includeNonText)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error fetching GitHub repo: %v\n", err)
 		return
@@ -101,9 +101,9 @@ func fetchAndSaveRepo(repoURL, outputType, outputDir, outputName string, gitIgno
 	outputPath := filepath.Join(outputDir, outputName+"."+outputType)
 
 	if outputType == "json" {
-		err = internal.SaveAsJSON(projectData, outputPath, includeGit, includeNonText)
+		err = utils.SaveAsJSON(projectData, outputPath, includeGit, includeNonText)
 	} else if outputType == "md" {
-		err = internal.SaveAsMarkdown(projectData, outputPath, includeGit, includeNonText)
+		err = utils.SaveAsMarkdown(projectData, outputPath, includeGit, includeNonText)
 	} else {
 		fmt.Fprintf(os.Stderr, "Invalid output type. Use 'json' or 'md'\n")
 		return

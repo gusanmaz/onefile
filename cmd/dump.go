@@ -5,7 +5,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/gusanmaz/onefile/internal"
+	"github.com/gusanmaz/onefile/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -18,7 +18,7 @@ func NewDumpCmd() *cobra.Command {
 		Short: "Dump a local project to JSON or Markdown",
 		Long: `Dump a local project to JSON or Markdown.
 Exclude patterns can be specified directly or by referencing a file with @.
-Example: -e "*.go @.gitignore" -e "internal/extension_language_map.json go.mod go.sum"`,
+Example: -e "*.go @.gitignore" -e "utils/extension_language_map.json go.mod go.sum"`,
 		Run: func(cmd *cobra.Command, args []string) {
 			// Process exclude patterns
 			var processedPatterns []string
@@ -27,15 +27,15 @@ Example: -e "*.go @.gitignore" -e "internal/extension_language_map.json go.mod g
 				processedPatterns = append(processedPatterns, patterns...)
 			}
 
-			parsedExcludePatterns, err := internal.ParsePatterns(processedPatterns)
+			parsedExcludePatterns, err := utils.ParsePatterns(processedPatterns)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "Error parsing exclude patterns: %v\n", err)
 				return
 			}
 
-			gitIgnore := internal.CreateGitIgnoreMatcher(parsedExcludePatterns)
+			gitIgnore := utils.CreateGitIgnoreMatcher(parsedExcludePatterns)
 
-			projectData, err := internal.DumpProject(rootPath, gitIgnore, includeGit, includeNonText)
+			projectData, err := utils.DumpProject(rootPath, gitIgnore, includeGit, includeNonText)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "Error dumping project: %v\n", err)
 				return
@@ -46,9 +46,9 @@ Example: -e "*.go @.gitignore" -e "internal/extension_language_map.json go.mod g
 			}
 
 			if outputType == "json" {
-				err = internal.SaveAsJSON(projectData, outputPath+".json", includeGit, includeNonText)
+				err = utils.SaveAsJSON(projectData, outputPath+".json", includeGit, includeNonText)
 			} else if outputType == "md" {
-				err = internal.SaveAsMarkdown(projectData, outputPath+".md", includeGit, includeNonText)
+				err = utils.SaveAsMarkdown(projectData, outputPath+".md", includeGit, includeNonText)
 			} else {
 				fmt.Fprintf(os.Stderr, "Invalid output type. Use 'json' or 'md'\n")
 				return

@@ -6,7 +6,7 @@ import (
 	"io/ioutil"
 	"os"
 
-	"github.com/gusanmaz/onefile/internal"
+	"github.com/gusanmaz/onefile/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -23,14 +23,14 @@ func NewReconstructCmd() *cobra.Command {
 				return
 			}
 
-			var projectData internal.ProjectData
+			var projectData utils.ProjectData
 			err = json.Unmarshal(data, &projectData)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "Error unmarshaling JSON: %v\n", err)
 				return
 			}
 
-			err = internal.ReconstructProject(projectData, outputPath)
+			err = utils.ReconstructProject(projectData, outputPath)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "Error reconstructing project: %v\n", err)
 				return

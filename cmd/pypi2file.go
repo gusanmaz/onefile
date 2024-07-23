@@ -5,7 +5,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/gusanmaz/onefile/internal"
+	"github.com/gusanmaz/onefile/utils"
 	"github.com/spf13/cobra"
 )
 
@@ -17,7 +17,7 @@ func NewPyPI2FileCmd() *cobra.Command {
 		Short: "Fetch a PyPI package and save as JSON or Markdown",
 		Long:  `Fetch a PyPI package and save its structure and contents as JSON or Markdown.`,
 		Run: func(cmd *cobra.Command, args []string) {
-			projectData, err := internal.FetchPyPIPackage(packageName)
+			projectData, err := utils.FetchPyPIPackage(packageName)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "Error fetching PyPI package: %v\n", err)
 				return
@@ -36,9 +36,9 @@ func NewPyPI2FileCmd() *cobra.Command {
 			}
 
 			if outputType == "json" {
-				err = internal.SaveAsJSON(projectData, outputPath, includeGit, includeNonText)
+				err = utils.SaveAsJSON(projectData, outputPath, includeGit, includeNonText)
 			} else if outputType == "md" {
-				err = internal.SaveAsMarkdown(projectData, outputPath, includeGit, includeNonText)
+				err = utils.SaveAsMarkdown(projectData, outputPath, includeGit, includeNonText)
 			} else {
 				fmt.Fprintf(os.Stderr, "Invalid output type. Use 'json' or 'md'\n")
 				return
