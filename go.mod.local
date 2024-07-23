@@ -1,4 +1,4 @@
-module onefile
+module github.com/gusanmaz/onefile
 
 go 1.16
 

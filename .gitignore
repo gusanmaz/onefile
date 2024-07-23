@@ -1,0 +1,11 @@
+bin/
+.idea/
+
+*.md
+!README.md
+
+exc.txt
+
+go.work
+go.work.sum
+go.mod.local
