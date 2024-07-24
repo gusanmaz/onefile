@@ -54,16 +54,26 @@ func DumpProject(rootPath string, gitIgnore *ignore.GitIgnore, includeGit, inclu
 }
 
 func ReconstructProject(projectData ProjectData, outputPath string) error {
+	// First, create all directories
 	for _, dir := range projectData.Directories {
-		err := os.MkdirAll(filepath.Join(outputPath, dir), 0755)
+		fullPath := filepath.Join(outputPath, dir)
+		err := os.MkdirAll(fullPath, 0755)
 		if err != nil {
-			return fmt.Errorf("error creating directory %s: %v", dir, err)
+			return fmt.Errorf("error creating directory %s: %v", fullPath, err)
 		}
 	}
 
+	// Then, create all files
 	for _, file := range projectData.Files {
 		filePath := filepath.Join(outputPath, file.Path)
-		err := ioutil.WriteFile(filePath, []byte(file.Content), 0644)
+
+		// Ensure the directory exists (in case it wasn't explicitly listed in Directories)
+		err := os.MkdirAll(filepath.Dir(filePath), 0755)
+		if err != nil {
+			return fmt.Errorf("error creating directory for file %s: %v", filePath, err)
+		}
+
+		err = ioutil.WriteFile(filePath, []byte(file.Content), 0644)
 		if err != nil {
 			return fmt.Errorf("error writing file %s: %v", file.Path, err)
 		}
