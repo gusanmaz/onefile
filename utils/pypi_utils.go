@@ -6,14 +6,17 @@ import (
 	"compress/gzip"
 	"encoding/json"
 	"fmt"
+	"github.com/gabriel-vasile/mimetype"
 	"io"
 	"io/ioutil"
 	"net/http"
 	"os"
 	"strings"
+
+	"github.com/sabhiram/go-gitignore"
 )
 
-func FetchPyPIPackage(packageName string) (ProjectData, error) {
+func FetchPyPIPackage(packageName string, gitIgnore *ignore.GitIgnore, includeGit, includeNonText bool) (ProjectData, error) {
 	var projectData ProjectData
 
 	url := fmt.Sprintf("https://pypi.org/pypi/%s/json", packageName)
@@ -85,15 +88,15 @@ func FetchPyPIPackage(packageName string) (ProjectData, error) {
 	}
 
 	if strings.HasSuffix(packageURL, ".tar.gz") {
-		return extractTarGz(tmpFile)
+		return extractTarGz(tmpFile, gitIgnore, includeGit, includeNonText)
 	} else if strings.HasSuffix(packageURL, ".whl") {
-		return extractWheel(tmpFile)
+		return extractWheel(tmpFile, gitIgnore, includeGit, includeNonText)
 	} else {
 		return projectData, fmt.Errorf("unsupported package format: %s", packageURL)
 	}
 }
 
-func extractTarGz(file *os.File) (ProjectData, error) {
+func extractTarGz(file *os.File, gitIgnore *ignore.GitIgnore, includeGit, includeNonText bool) (ProjectData, error) {
 	var projectData ProjectData
 
 	gzr, err := gzip.NewReader(file)
@@ -113,6 +116,10 @@ func extractTarGz(file *os.File) (ProjectData, error) {
 			return projectData, err
 		}
 
+		if !MatchesPatterns(header.Name, gitIgnore, includeGit, includeNonText) {
+			continue
+		}
+
 		switch header.Typeflag {
 		case tar.TypeDir:
 			projectData.Directories = append(projectData.Directories, header.Name)
@@ -121,14 +128,19 @@ func extractTarGz(file *os.File) (ProjectData, error) {
 			if err != nil {
 				return projectData, err
 			}
-			projectData.Files = append(projectData.Files, FileData{Path: header.Name, Content: string(content)})
+			if IsTextContent(content) || includeNonText {
+				projectData.Files = append(projectData.Files, FileData{Path: header.Name, Content: string(content)})
+			} else {
+				mime := mimetype.Detect(content)
+				projectData.Files = append(projectData.Files, FileData{Path: header.Name, Content: fmt.Sprintf("[Binary file: %s]", mime.String())})
+			}
 		}
 	}
 
 	return projectData, nil
 }
 
-func extractWheel(file *os.File) (ProjectData, error) {
+func extractWheel(file *os.File, gitIgnore *ignore.GitIgnore, includeGit, includeNonText bool) (ProjectData, error) {
 	var projectData ProjectData
 
 	fileInfo, err := file.Stat()
@@ -142,6 +154,10 @@ func extractWheel(file *os.File) (ProjectData, error) {
 	}
 
 	for _, f := range r.File {
+		if !MatchesPatterns(f.Name, gitIgnore, includeGit, includeNonText) {
+			continue
+		}
+
 		if f.FileInfo().IsDir() {
 			projectData.Directories = append(projectData.Directories, f.Name)
 		} else {
@@ -154,7 +170,12 @@ func extractWheel(file *os.File) (ProjectData, error) {
 			if err != nil {
 				return projectData, err
 			}
-			projectData.Files = append(projectData.Files, FileData{Path: f.Name, Content: string(content)})
+			if IsTextContent(content) || includeNonText {
+				projectData.Files = append(projectData.Files, FileData{Path: f.Name, Content: string(content)})
+			} else {
+				mime := mimetype.Detect(content)
+				projectData.Files = append(projectData.Files, FileData{Path: f.Name, Content: fmt.Sprintf("[Binary file: %s]", mime.String())})
+			}
 		}
 	}
 

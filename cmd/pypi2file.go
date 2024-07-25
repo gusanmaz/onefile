@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/gusanmaz/onefile/utils"
 	"github.com/spf13/cobra"
@@ -11,13 +12,29 @@ import (
 
 func NewPyPI2FileCmd() *cobra.Command {
 	var packageName, outputType, outputDir, outputName string
+	var excludePatterns []string
 	var includeGit, includeNonText bool
 	var cmd = &cobra.Command{
 		Use:   "pypi2file",
 		Short: "Fetch a PyPI package and save as JSON or Markdown",
 		Long:  `Fetch a PyPI package and save its structure and contents as JSON or Markdown.`,
 		Run: func(cmd *cobra.Command, args []string) {
-			projectData, err := utils.FetchPyPIPackage(packageName)
+			// Process exclude patterns
+			var processedPatterns []string
+			for _, pattern := range excludePatterns {
+				patterns := strings.Fields(pattern)
+				processedPatterns = append(processedPatterns, patterns...)
+			}
+
+			parsedExcludePatterns, err := utils.ParsePatterns(processedPatterns)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Error parsing exclude patterns: %v\n", err)
+				return
+			}
+
+			gitIgnore := utils.CreateGitIgnoreMatcher(parsedExcludePatterns)
+
+			projectData, err := utils.FetchPyPIPackage(packageName, gitIgnore, includeGit, includeNonText)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "Error fetching PyPI package: %v\n", err)
 				return
@@ -57,6 +74,7 @@ func NewPyPI2FileCmd() *cobra.Command {
 	cmd.Flags().StringVarP(&outputType, "type", "t", "md", "Output type: json or md")
 	cmd.Flags().StringVarP(&outputDir, "output-dir", "d", ".", "Output directory")
 	cmd.Flags().StringVarP(&outputName, "output-name", "n", "", "Output file name (without extension)")
+	cmd.Flags().StringArrayVarP(&excludePatterns, "exclude", "e", []string{}, "Patterns to exclude files (Use @ for file-based patterns, e.g., @.gitignore)")
 	cmd.Flags().BoolVar(&includeGit, "include-git", false, "Include .git files and directories")
 	cmd.Flags().BoolVar(&includeNonText, "include-non-text", false, "Include non-text files")
 
