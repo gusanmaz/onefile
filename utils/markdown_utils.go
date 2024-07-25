@@ -9,17 +9,17 @@ import (
 	"strings"
 )
 
-func GenerateMarkdown(projectData ProjectData, includeGit, includeNonText bool) string {
+func GenerateMarkdown(projectData ProjectData, includeGit, includeNonText, showExcluded bool) string {
 	var md strings.Builder
 
 	md.WriteString("# Project Structure\n\n")
 	md.WriteString("```\n")
-	md.WriteString(generateProjectTree(projectData, includeGit, includeNonText))
+	md.WriteString(generateProjectTree(projectData, includeGit, includeNonText, showExcluded))
 	md.WriteString("```\n\n")
 
 	md.WriteString("## Shell Commands to Create Project Structure\n\n")
 	md.WriteString("```bash\n")
-	md.WriteString(GenerateShellCommands(projectData, includeGit, includeNonText))
+	md.WriteString(GenerateShellCommands(projectData, includeGit, includeNonText, showExcluded))
 	md.WriteString("```\n\n")
 
 	md.WriteString("## File Contents\n\n")
@@ -33,18 +33,18 @@ func GenerateMarkdown(projectData ProjectData, includeGit, includeNonText bool) 
 	return md.String()
 }
 
-func generateProjectTree(projectData ProjectData, includeGit, includeNonText bool) string {
+func generateProjectTree(projectData ProjectData, includeGit, includeNonText, showExcluded bool) string {
 	var tree strings.Builder
 	tree.WriteString(".\n")
 
 	var allPaths []string
 	for _, dir := range projectData.Directories {
-		if includeGit || !strings.HasPrefix(dir, ".git") {
+		if (includeGit || !strings.HasPrefix(dir, ".git")) && (showExcluded || dir != "") {
 			allPaths = append(allPaths, dir)
 		}
 	}
 	for _, file := range projectData.Files {
-		if (includeGit || !strings.HasPrefix(file.Path, ".git")) && (includeNonText || isTextFile(file.Path)) {
+		if (includeGit || !strings.HasPrefix(file.Path, ".git/")) && (includeNonText || isTextFile(file.Path)) && (showExcluded || file.Content != "") {
 			allPaths = append(allPaths, file.Path)
 		}
 	}
@@ -66,17 +66,17 @@ func generateProjectTree(projectData ProjectData, includeGit, includeNonText boo
 	return tree.String()
 }
 
-func GenerateShellCommands(projectData ProjectData, includeGit, includeNonText bool) string {
+func GenerateShellCommands(projectData ProjectData, includeGit, includeNonText, showExcluded bool) string {
 	var commands strings.Builder
 
 	for _, dir := range projectData.Directories {
-		if includeGit || !strings.HasPrefix(dir, ".git") {
+		if (includeGit || !strings.HasPrefix(dir, ".git")) && (showExcluded || dir != "") {
 			commands.WriteString(fmt.Sprintf("mkdir -p \"%s\"\n", dir))
 		}
 	}
 
 	for _, file := range projectData.Files {
-		if (includeGit || !strings.HasPrefix(file.Path, ".git/")) && (includeNonText || isTextFile(file.Path)) {
+		if (includeGit || !strings.HasPrefix(file.Path, ".git/")) && (includeNonText || isTextFile(file.Path)) && (showExcluded || file.Content != "") {
 			dir := filepath.Dir(file.Path)
 			if dir != "." {
 				commands.WriteString(fmt.Sprintf("mkdir -p \"%s\"\n", dir))
@@ -88,7 +88,7 @@ func GenerateShellCommands(projectData ProjectData, includeGit, includeNonText b
 	return commands.String()
 }
 
-func SaveAsMarkdown(projectData ProjectData, outputPath string, includeGit, includeNonText bool) error {
-	markdown := GenerateMarkdown(projectData, includeGit, includeNonText)
+func SaveAsMarkdown(projectData ProjectData, outputPath string, includeGit, includeNonText, showExcluded bool) error {
+	markdown := GenerateMarkdown(projectData, includeGit, includeNonText, showExcluded)
 	return ioutil.WriteFile(outputPath, []byte(markdown), 0644)
 }

@@ -14,7 +14,7 @@ import (
 func NewGitHub2FileCmd() *cobra.Command {
 	var repoURL, outputType, outputDir, outputName, githubToken string
 	var excludePatterns []string
-	var allRepos, useGit, includeGit, includeNonText bool
+	var allRepos, useGit, includeGit, includeNonText, showExcluded bool
 	var cmd = &cobra.Command{
 		Use:   "github2file",
 		Short: "Fetch a GitHub repository and save as JSON or Markdown",
@@ -56,10 +56,10 @@ Example: -e "*.go @.gitignore" -e "utils/extension_language_map.json go.mod go.s
 				}
 
 				for _, repo := range repos {
-					fetchAndSaveRepo(fmt.Sprintf("https://github.com/%s/%s", owner, repo.Name), outputType, outputDir, outputName, gitIgnore, useGit, githubToken, includeGit, includeNonText)
+					fetchAndSaveRepo(fmt.Sprintf("https://github.com/%s/%s", owner, repo.Name), outputType, outputDir, outputName, gitIgnore, useGit, githubToken, includeGit, includeNonText, showExcluded)
 				}
 			} else {
-				fetchAndSaveRepo(repoURL, outputType, outputDir, outputName, gitIgnore, useGit, githubToken, includeGit, includeNonText)
+				fetchAndSaveRepo(repoURL, outputType, outputDir, outputName, gitIgnore, useGit, githubToken, includeGit, includeNonText, showExcluded)
 			}
 		},
 	}
@@ -74,11 +74,12 @@ Example: -e "*.go @.gitignore" -e "utils/extension_language_map.json go.mod go.s
 	cmd.Flags().StringVarP(&githubToken, "token", "k", "", "GitHub API token")
 	cmd.Flags().BoolVar(&includeGit, "include-git", false, "Include .git files and directories")
 	cmd.Flags().BoolVar(&includeNonText, "include-non-text", false, "Include non-text files")
+	cmd.Flags().BoolVar(&showExcluded, "show-excluded", false, "Show excluded files in project structure and shell commands")
 
 	return cmd
 }
 
-func fetchAndSaveRepo(repoURL, outputType, outputDir, outputName string, gitIgnore *ignore.GitIgnore, useGit bool, githubToken string, includeGit, includeNonText bool) {
+func fetchAndSaveRepo(repoURL, outputType, outputDir, outputName string, gitIgnore *ignore.GitIgnore, useGit bool, githubToken string, includeGit, includeNonText, showExcluded bool) {
 	owner, repo, path, err := utils.ParseGitHubURL(repoURL)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error parsing GitHub URL: %v\n", err)
@@ -103,7 +104,7 @@ func fetchAndSaveRepo(repoURL, outputType, outputDir, outputName string, gitIgno
 	if outputType == "json" {
 		err = utils.SaveAsJSON(projectData, outputPath, includeGit, includeNonText)
 	} else if outputType == "md" {
-		err = utils.SaveAsMarkdown(projectData, outputPath, includeGit, includeNonText)
+		err = utils.SaveAsMarkdown(projectData, outputPath, includeGit, includeNonText, showExcluded)
 	} else {
 		fmt.Fprintf(os.Stderr, "Invalid output type. Use 'json' or 'md'\n")
 		return

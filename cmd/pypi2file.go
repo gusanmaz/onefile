@@ -13,7 +13,7 @@ import (
 func NewPyPI2FileCmd() *cobra.Command {
 	var packageName, outputType, outputDir, outputName string
 	var excludePatterns []string
-	var includeGit, includeNonText bool
+	var includeGit, includeNonText, showExcluded bool
 	var cmd = &cobra.Command{
 		Use:   "pypi2file",
 		Short: "Fetch a PyPI package and save as JSON or Markdown",
@@ -55,7 +55,7 @@ func NewPyPI2FileCmd() *cobra.Command {
 			if outputType == "json" {
 				err = utils.SaveAsJSON(projectData, outputPath, includeGit, includeNonText)
 			} else if outputType == "md" {
-				err = utils.SaveAsMarkdown(projectData, outputPath, includeGit, includeNonText)
+				err = utils.SaveAsMarkdown(projectData, outputPath, includeGit, includeNonText, showExcluded)
 			} else {
 				fmt.Fprintf(os.Stderr, "Invalid output type. Use 'json' or 'md'\n")
 				return
@@ -77,6 +77,7 @@ func NewPyPI2FileCmd() *cobra.Command {
 	cmd.Flags().StringArrayVarP(&excludePatterns, "exclude", "e", []string{}, "Patterns to exclude files (Use @ for file-based patterns, e.g., @.gitignore)")
 	cmd.Flags().BoolVar(&includeGit, "include-git", false, "Include .git files and directories")
 	cmd.Flags().BoolVar(&includeNonText, "include-non-text", false, "Include non-text files")
+	cmd.Flags().BoolVar(&showExcluded, "show-excluded", false, "Show excluded files in project structure and shell commands")
 
 	cmd.MarkFlagRequired("package")
 

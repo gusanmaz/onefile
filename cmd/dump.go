@@ -12,7 +12,7 @@ import (
 func NewDumpCmd() *cobra.Command {
 	var rootPath, outputPath, outputType string
 	var excludePatterns []string
-	var includeGit, includeNonText bool
+	var includeGit, includeNonText, showExcluded bool
 	var cmd = &cobra.Command{
 		Use:   "dump",
 		Short: "Dump a local project to JSON or Markdown",
@@ -48,7 +48,7 @@ Example: -e "*.go @.gitignore" -e "utils/extension_language_map.json go.mod go.s
 			if outputType == "json" {
 				err = utils.SaveAsJSON(projectData, outputPath+".json", includeGit, includeNonText)
 			} else if outputType == "md" {
-				err = utils.SaveAsMarkdown(projectData, outputPath+".md", includeGit, includeNonText)
+				err = utils.SaveAsMarkdown(projectData, outputPath+".md", includeGit, includeNonText, showExcluded)
 			} else {
 				fmt.Fprintf(os.Stderr, "Invalid output type. Use 'json' or 'md'\n")
 				return
@@ -69,6 +69,7 @@ Example: -e "*.go @.gitignore" -e "utils/extension_language_map.json go.mod go.s
 	cmd.Flags().StringArrayVarP(&excludePatterns, "exclude", "e", []string{}, "Patterns to exclude files (Use @ for file-based patterns, e.g., @.gitignore)")
 	cmd.Flags().BoolVar(&includeGit, "include-git", false, "Include .git files and directories")
 	cmd.Flags().BoolVar(&includeNonText, "include-non-text", false, "Include non-text files")
+	cmd.Flags().BoolVar(&showExcluded, "show-excluded", false, "Show excluded files in project structure and shell commands")
 
 	return cmd
 }
