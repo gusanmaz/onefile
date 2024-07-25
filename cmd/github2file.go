@@ -2,12 +2,12 @@ package cmd
 
 import (
 	"fmt"
-	ignore "github.com/sabhiram/go-gitignore"
 	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/gusanmaz/onefile/utils"
+	ignore "github.com/sabhiram/go-gitignore"
 	"github.com/spf13/cobra"
 )
 
@@ -20,10 +20,15 @@ func NewGitHub2FileCmd() *cobra.Command {
 		Short: "Fetch a GitHub repository and save as JSON or Markdown",
 		Long: `Fetch a GitHub repository and save its structure and contents as JSON or Markdown.
 Exclude patterns can be specified directly or by referencing a file with @.
-Example: -e "*.go @.gitignore" -e "utils/extension_language_map.json go.mod go.sum"`,
+Example: -e "*.go @.gitignore" -e "utils/extension_language_map.json go.mod go.sum"
+
+The repository URL can be specified in various formats:
+- Full URL: https://github.com/username/repo
+- Without protocol: github.com/username/repo
+- Short form: username/repo`,
 		Run: func(cmd *cobra.Command, args []string) {
 			if repoURL == "" && !allRepos {
-				fmt.Println("Please provide a GitHub URL or use the -a flag")
+				fmt.Println("Please provide a GitHub repository URL or use the -a flag")
 				return
 			}
 
@@ -56,7 +61,7 @@ Example: -e "*.go @.gitignore" -e "utils/extension_language_map.json go.mod go.s
 				}
 
 				for _, repo := range repos {
-					fetchAndSaveRepo(fmt.Sprintf("https://github.com/%s/%s", owner, repo.Name), outputType, outputDir, outputName, gitIgnore, useGit, githubToken, includeGit, includeNonText, showExcluded)
+					fetchAndSaveRepo(fmt.Sprintf("%s/%s", owner, repo.Name), outputType, outputDir, outputName, gitIgnore, useGit, githubToken, includeGit, includeNonText, showExcluded)
 				}
 			} else {
 				fetchAndSaveRepo(repoURL, outputType, outputDir, outputName, gitIgnore, useGit, githubToken, includeGit, includeNonText, showExcluded)
@@ -64,7 +69,7 @@ Example: -e "*.go @.gitignore" -e "utils/extension_language_map.json go.mod go.s
 		},
 	}
 
-	cmd.Flags().StringVarP(&repoURL, "url", "u", "", "GitHub repository URL")
+	cmd.Flags().StringVarP(&repoURL, "url", "u", "", "GitHub repository URL or shorthand (e.g., username/repo)")
 	cmd.Flags().StringVarP(&outputType, "type", "t", "md", "Output type: json or md")
 	cmd.Flags().StringVarP(&outputDir, "output-dir", "d", ".", "Output directory")
 	cmd.Flags().StringVarP(&outputName, "output-name", "n", "", "Output file name (without extension)")

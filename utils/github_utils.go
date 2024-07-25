@@ -190,19 +190,29 @@ func FetchUserRepos(username, githubToken string) ([]GithubRepo, error) {
 }
 
 func ParseGitHubURL(url string) (owner string, repo string, path string, err error) {
+	// Remove any leading "https://" or "http://"
+	url = strings.TrimPrefix(url, "https://")
+	url = strings.TrimPrefix(url, "http://")
+
+	// Remove any leading "github.com/"
+	url = strings.TrimPrefix(url, "github.com/")
+
 	parts := strings.Split(url, "/")
-	if len(parts) < 5 || parts[2] != "github.com" {
-		return "", "", "", fmt.Errorf("invalid GitHub URL: %s", url)
+
+	if len(parts) < 2 {
+		return "", "", "", fmt.Errorf("invalid GitHub URL or repository format: %s", url)
 	}
-	owner = parts[3]
-	repo = parts[4]
-	path = ""
-	if len(parts) > 5 {
-		if parts[5] == "tree" && len(parts) > 7 {
-			path = strings.Join(parts[7:], "/")
-		} else if parts[5] != "tree" {
-			path = strings.Join(parts[5:], "/")
+
+	owner = parts[0]
+	repo = parts[1]
+
+	if len(parts) > 2 {
+		if parts[2] == "tree" && len(parts) > 3 {
+			path = strings.Join(parts[4:], "/")
+		} else {
+			path = strings.Join(parts[2:], "/")
 		}
 	}
+
 	return owner, repo, path, nil
 }
